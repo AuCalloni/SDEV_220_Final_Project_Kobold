@@ -56,7 +56,7 @@ class DataTransferController:
             return
 
         # Find the end date (Sunday) of the current week from the current week entries
-        last_entry_date = max(entry[2] for entry in current_week_entries)
+        last_entry_date = max(datetime.strptime(entry[2], '%Y-%m-%d').date() for entry in current_week_entries)
 
         # Check if today is greater than the end of the current week
         if today > last_entry_date:
