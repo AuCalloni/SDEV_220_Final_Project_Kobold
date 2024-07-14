@@ -121,3 +121,10 @@ class PreviousWeeksSignInSignOut:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM PreviousWeeksSignInSignOut')
             conn.commit()
+
+    # Same method in our current week model that handles fetching a single entry.
+    def get_entry_by_id(self, record_id):
+        with self.db.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''SELECT * FROM PreviousWeeksSignInSignOut WHERE RecordID = ?''', (record_id,))
+            return cursor.fetchone()

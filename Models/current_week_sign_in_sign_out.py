@@ -42,3 +42,10 @@ class CurrentWeekSignInSignOut:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM CurrentWeekSignInSignOut')
             conn.commit()
+
+    # Method that handles getting a single entry. This is used to validate that the update entry command worked.
+    def get_entry_by_id(self, record_id):
+        with self.db.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''SELECT * FROM CurrentWeekSignInSignOut WHERE RecordID = ?''', (record_id,))
+            return cursor.fetchone()
