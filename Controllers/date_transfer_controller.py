@@ -5,6 +5,7 @@ from Models.current_week_sign_in_sign_out import CurrentWeekSignInSignOut
 from Models.previous_weeks_sign_in_sign_out import PreviousWeeksSignInSignOut
 from Models.database import Database
 
+
 # The intention is for the program to automatically dump the current week data into the previous week table
 # at the end of the week. This class does exactly that.
 class DataTransferController:
@@ -18,7 +19,9 @@ class DataTransferController:
     def transfer_current_to_previous(self):
         entries = self.current_week_model.get_all_entries()
         for entry in entries:
-            self.previous_week_model.add_entry(entry[1], entry[2], entry[3], entry[4], entry[5])
+            # Refactored to give each entry a meaningful name.
+            badge_num, date, sign_in_time, sign_out_time, additional_notes = entry[1:6]
+            self.previous_week_model.add_entry(badge_num, date, sign_in_time, sign_out_time, additional_notes)
         # Clear the table once this is done.
         self.current_week_model.clear_entries()
 
@@ -31,8 +34,7 @@ class DataTransferController:
         associates = self.associate_model.get_all_associates()
 
         # Get the Monday of the current week
-        today = datetime.now().date()
-        start_of_week = today - timedelta(days=today.weekday())
+        start_of_week = self._get_start_of_week(datetime.now().date())
 
         # Insert new entries for each associate for each day of the current week
         for associate in associates:
@@ -62,6 +64,13 @@ class DataTransferController:
         if today > last_entry_date:
             self.transfer_current_to_previous()
             self.initialize_new_week()
-        else:
-            # Do nothing because the week is not over.
-            return
+
+    # Private method to get the monday of the current week. A handful of our methods use this so I thought it made sense
+    # to give it its own method.
+    def _get_start_of_week(self, date):
+        return date - timedelta(days=date.weekday())
+
+    # Private method to parse the datetime, also something used by a handful of the methods in here. Refactored to
+    # call this particular method.
+    def _parse_date(self, date_str):
+        return datetime.strptime(date_str, '%Y-%m-%d').date()

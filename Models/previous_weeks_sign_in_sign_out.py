@@ -1,106 +1,72 @@
 from datetime import timedelta, datetime
+from idlelib import query
 
 
+# Model class to handle data interactions with the previous weekly entries table.
 class PreviousWeeksSignInSignOut:
     def __init__(self, db):
         self.db = db
 
-    # These 3 methods are essentially the same as the get current entries.
+    # Method to add entry to the table. Mostly only used by our date_transfer_controller
     def add_entry(self, badge_num, date, sign_in_time, sign_out_time, additional_notes):
-        with self.db.connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''INSERT INTO PreviousWeeksSignInSignOut (BadgeNum, Date, SignInTime, SignOutTime, AdditionalNotes)
-                              VALUES (?, ?, ?, ?, ?)''',
-                           (badge_num, date, sign_in_time, sign_out_time, additional_notes))
-            conn.commit()
+        query = '''INSERT INTO PreviousWeeksSignInSignOut (BadgeNum, Date, SignInTime, SignOutTime, AdditionalNotes)
+                   VALUES (?, ?, ?, ?, ?)'''
+        self._execute_query(query, (badge_num, date, sign_in_time, sign_out_time, additional_notes))
 
+    # Method to update a single entry if needed.
     def update_entry(self, record_id, sign_in_time, sign_out_time, additional_notes):
-        with self.db.connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''UPDATE PreviousWeeksSignInSignOut
-                              SET SignInTime = ?, SignOutTime = ?, AdditionalNotes = ?
-                              WHERE RecordID = ?''',
-                           (sign_in_time, sign_out_time, additional_notes, record_id))
-            conn.commit()
+        query = '''UPDATE PreviousWeeksSignInSignOut
+                   SET SignInTime = ?, SignOutTime = ?, AdditionalNotes = ?
+                   WHERE RecordID = ?'''
+        self._execute_query(query, (sign_in_time, sign_out_time, additional_notes, record_id))
 
+    # Return all entries using a provided date range.
     def get_entries_for_week(self, start_date, end_date):
-        with self.db.connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''SELECT * FROM PreviousWeeksSignInSignOut WHERE Date BETWEEN ? AND ?''',
-                           (start_date, end_date))
-            return cursor.fetchall()
+        query = '''SELECT * FROM PreviousWeeksSignInSignOut WHERE Date BETWEEN ? AND ?'''
+        return self._fetch_all(query, (start_date, end_date))
 
-    # This is where it differs. To handle pagination and the ability to NOT retrieve EVERY SINGLE entry from
-    # weeks prior, there's quite a bit of logic needed to achieve this. First we have our get_total_weeks method
-    # which calculates the total amount of weeks stored in the Previous Signout Table.
+    # Clear all entries from the table. This is only used for testing purposes. Using this in prod could be
+    # DISASTEROUS!!
+    def clear_entries(self):
+        query = 'DELETE FROM PreviousWeeksSignInSignOut'
+        self._execute_query(query)
+
+    # Get a single entry from the table via the provided record_id
+    def get_entry_by_id(self, record_id):
+        query = '''SELECT * FROM PreviousWeeksSignInSignOut WHERE RecordID = ?'''
+        return self._fetch_one(query, (record_id,))
+
     def get_total_weeks(self):
-        with self.db.connect() as conn:
-            cursor = conn.cursor()
-            # SQL statement to retrieve the lowest date and the highest date.
-            cursor.execute('''SELECT MIN(Date), MAX(Date) FROM PreviousWeeksSignInSignOut''')
-            result = cursor.fetchone()
-            # Return 0 weeks if there is nothing retrieved.
-            if result[0] is None or result[1] is None:
-                return 0
-            # Convert our earliest date to Y-M-D format as a datetime object.
-            start_date = datetime.strptime(result[0], '%Y-%m-%d').date()
-            # Convert our latest date to Y-M-D format as a datetime object.
-            end_date = datetime.strptime(result[1], '%Y-%m-%d').date()
-            # Get the amount of days in between.
-            total_days = (end_date - start_date).days
-            # Divide by 7 for amount of weeks and add 1 if total_weeks is not divisible by 7
-            # to account for any remaining days that are less than week, thus counting it as a full week.
-            total_weeks = total_days // 7
-            if total_days % 7 != 0:
-                total_weeks += 1
-            return total_weeks
-    # This method is used to retrieve the date ranges per page.
+        query = '''SELECT MIN(Date), MAX(Date) FROM PreviousWeeksSignInSignOut'''
+        result = self._fetch_one(query)
+        # Return 0 weeks if there is nothing retrieved.
+        if result[0] is None or result[1] is None:
+            return 0
+        # Convert our earliest date to Y-M-D format as a datetime object.
+        start_date = datetime.strptime(result[0], '%Y-%m-%d').date()
+        # Convert our latest date to Y-M-D format as a datetime object.
+        end_date = datetime.strptime(result[1], '%Y-%m-%d').date()
+        # Get the amount of days in between.
+        total_days = (end_date - start_date).days
+        # Divide by 7 for amount of weeks and add 1 if total_weeks is not divisible by 7
+        # to account for any remaining days that are less than week, thus counting it as a full week.
+        return (total_days // 7) + (1 if total_days % 7 != 0 else 0)
+        # This method was doing far too much, so it's been refactored. The original looping logic has been placed in its
+
+    # own method now.
     def get_week_date_range(self, page_number, page_size=1):
-        with self.db.connect() as conn:
-            cursor = conn.cursor()
-            # Retrieve distinct dates so we don't get duplicate entries.
-            cursor.execute('''SELECT DISTINCT Date FROM PreviousWeeksSignInSignOut ORDER BY Date ASC''')
-
-            # For each retrieved date, convert the date to a datetime object.
-            all_dates = [datetime.strptime(row[0], '%Y-%m-%d').date() for row in cursor.fetchall()]
-
-        # Ugly logic starts here. Indices are typically 0-indexed so we subtract 1 and multiply by page size.
-        start_index = (page_number - 1) * page_size
-
-        # Our last index page is just our starting + our page size. This is only useful in the event we need
-        # to pass in more than 1 page to the method.
-        end_index = start_index + page_size
-
-        # Empty weeks list, and current week is none.
-        weeks = []
-        current_week = None
-        # Loop through using enumerate. It'll return the index and the date per loop.
-        for i, date in enumerate(all_dates):
-            # Current week starts out as none
-            if current_week is None:
-                # Take our current date in the loop and subtract the date as weekday to get the monday of the current
-                # week.
-                start_date = date - timedelta(days=date.weekday())
-                # Add 6 to the monday to get sunday.
-                end_date = start_date + timedelta(days=6)
-                # Current week of our iteration assigned as a tuple.
-                current_week = (start_date, end_date)
-                # Append it to the list.
-                weeks.append(current_week)
-            # Check if our next date iteration is greater than end date of week prior.
-            elif date > current_week[1]:
-                # Get monday of week
-                start_date = date - timedelta(days=date.weekday())
-                # Get Sunday of week
-                end_date = start_date + timedelta(days=6)
-                # Assign current week tuple
-                current_week = (start_date, end_date)
-                # Append it
-                weeks.append(current_week)
-        # ONLY return a slice of the weeks that we need. There's no point in returning literally every date at once.
-        # IT WILL LAG!!!!
-        paginated_weeks = weeks[start_index:end_index]
-        return paginated_weeks
+        # Select every distinct date from the table.
+        query = '''SELECT DISTINCT Date FROM PreviousWeeksSignInSignOut ORDER BY Date ASC'''
+        # For each retrieved date, convert the date to a datetime object.
+        all_dates = [datetime.strptime(row[0], '%Y-%m-%d').date() for row in self._fetch_all(query)]
+        # Get every week as a grouping
+        weeks = self._group_dates_into_weeks(all_dates)
+        # Return a list comprehension using our page number - 1 (since lists are 0 indexed) multiplied by the
+        # page size depending on how big we want our "pages" to be. The end of the list is just the page_number
+        # multiplied by the page_size.
+        # Page_size is essentially just a scale factor for both the beginning and end of the list comprehension
+        # depending on how big the pages will be.
+        return weeks[(page_number - 1) * page_size: page_number * page_size]
 
     # Pagination function using our two methods created above.
     def get_paginated_weekly_entries(self, page_number, page_size=1):
@@ -108,23 +74,51 @@ class PreviousWeeksSignInSignOut:
         weeks = self.get_week_date_range(page_number, page_size)
         paginated_entries = []
         for start_date, end_date in weeks:
-            # Return entries for the week after we get our date range.
-            weekly_entries = self.get_entries_for_week(start_date, end_date)
-            # Tack it on to the paginated list.
-            paginated_entries.extend(weekly_entries)
+            # Return entries for the week after we get our date range, and tack it on to the paginated list.
+            paginated_entries.extend(self.get_entries_for_week(start_date, end_date))
         total_weeks = self.get_total_weeks()
         # Return our paginated list and the total of all weeks.
         return paginated_entries, total_weeks
 
-    def clear_entries(self):
+    # Segregated boilerplate code for queries that are a commit.
+    def _execute_query(self, query, params=()):
         with self.db.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM PreviousWeeksSignInSignOut')
+            cursor.execute(query, params)
             conn.commit()
 
-    # Same method in our current week model that handles fetching a single entry.
-    def get_entry_by_id(self, record_id):
+    # Segregated boilerplate code for queries that return more than 1 entry.
+    def _fetch_all(self, query, params=()):
         with self.db.connect() as conn:
             cursor = conn.cursor()
-            cursor.execute('''SELECT * FROM PreviousWeeksSignInSignOut WHERE RecordID = ?''', (record_id,))
+            cursor.execute(query, params)
+            return cursor.fetchall()
+
+    # Segregated boilerplate code for queries that return a single entry.
+    def _fetch_one(self, query, params=()):
+        with self.db.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
             return cursor.fetchone()
+
+    # Originally used to be logic that was part of get_week_date_range. That method was doing far too much,
+    # so I broke it up into two separate methods.
+    def _group_dates_into_weeks(self, all_dates):
+        # Declare our weeks list
+        weeks = []
+        # Set current week to none.
+        current_week = None
+        for date in all_dates:
+            # current_week[1] will be the end date of each current_week item. Thus, we are checking if the date of our
+            # current iteration is greater than the end date (sunday) of our current_week. If it is, then we're good
+            # to add another group to the list.
+            if current_week is None or date > current_week[1]:
+                # Monday of the current date's week.
+                start_date = date - timedelta(days=date.weekday())
+                # Sunday of the corresponding date's week.
+                end_date = start_date + timedelta(days=6)
+                # Group them into a tuple
+                current_week = (start_date, end_date)
+                # Append them
+                weeks.append(current_week)
+        return weeks
