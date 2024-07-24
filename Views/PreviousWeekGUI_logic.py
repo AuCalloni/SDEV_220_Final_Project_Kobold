@@ -87,7 +87,7 @@ class PreviousWeekGUI(QMainWindow):
 
         # Clear previous data.
         self.original_data.clear()
-
+        self.modified_records.clear()
         # Loop through each row.
         for row, entry in enumerate(entries):
             # Set our record number.

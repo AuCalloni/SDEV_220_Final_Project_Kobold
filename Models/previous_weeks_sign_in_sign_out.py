@@ -67,7 +67,6 @@ class PreviousWeeksSignInSignOut:
             # Return entries for the week after we get our date range, and tack it on to the paginated list.
             paginated_entries.extend(self.get_entries_for_week(start_date, end_date))
         total_weeks = self.get_total_weeks()
-        print(total_weeks)
         # Return our paginated list and the total of all weeks.
         return paginated_entries, total_weeks
 
