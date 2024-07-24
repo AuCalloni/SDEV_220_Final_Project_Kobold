@@ -23,7 +23,11 @@ class Associate:
     def get_badge_num_by_name(self, name):
         query = 'SELECT BadgeNum FROM Associates WHERE Name = ?'
         result = self._fetch_one(query, (name,))
-        print(f"Query: {query}, Params: {name}, Result: {result}")
+        return result
+
+    def get_name_by_badge_num(self, badge_num):
+        query = 'SELECT Name FROM Associates WHERE BadgeNum = ?'
+        result = self._fetch_one(query, (badge_num,))
         return result
 
     # While refactoring this code, I found it to be pretty redundant to constantly call the sqlite database connection,
@@ -45,6 +49,7 @@ class Associate:
             # This returns a list of tuples.
             return cursor.fetchall()
 
+    # Logic to retrieve a single entry
     def _fetch_one(self, query, params=()):
         with self.db.connect() as conn:
             cursor = conn.cursor()

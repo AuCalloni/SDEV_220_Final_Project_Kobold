@@ -65,6 +65,15 @@ class DataTransferController:
             self.transfer_current_to_previous()
             self.initialize_new_week()
 
+    # Transfer the removed associate's current entries to the previous table, since they will no longer be adding
+    # entries to the table since they've been removed and all.
+    def transfer_removed_associate_data(self, badge_num):
+        entries = self.current_week_model.get_all_entries()
+        for entry in entries:
+            if entry[1] == int(badge_num):
+                self.previous_week_model.add_entry(entry[1], entry[2], entry[3], entry[4], entry[5])
+                self.current_week_model.remove_entry(entry[0])
+
     # Private method to get the monday of the current week. A handful of our methods use this so I thought it made sense
     # to give it its own method.
     def _get_start_of_week(self, date):

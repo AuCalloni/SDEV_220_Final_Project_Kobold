@@ -25,34 +25,24 @@ class PreviousWeeksSignInSignOut:
         query = '''SELECT * FROM PreviousWeeksSignInSignOut WHERE Date BETWEEN ? AND ?'''
         return self._fetch_all(query, (start_date, end_date))
 
-    # Clear all entries from the table. This is only used for testing purposes. Using this in prod could be
-    # DISASTEROUS!!
-    def clear_entries(self):
-        query = 'DELETE FROM PreviousWeeksSignInSignOut'
-        self._execute_query(query)
-
     # Get a single entry from the table via the provided record_id
     def get_entry_by_id(self, record_id):
         query = '''SELECT * FROM PreviousWeeksSignInSignOut WHERE RecordID = ?'''
         return self._fetch_one(query, (record_id,))
 
+    # The logic for this just wasn't working out, so I had to take a different approach. Previously it only worked
+    # as long as there were NO gaps in the previous weeks table's data. This way is much cleaner, shorter and ONLY
+    # counts the total week range as long as there is populated data. Gaps in empty weeks will not affect it any longer.
     def get_total_weeks(self):
-        query = '''SELECT MIN(Date), MAX(Date) FROM PreviousWeeksSignInSignOut'''
+        # This query works in such a way that it only counts DISTINCT week pairs from the previous weeks data table.
+        # the "strftime('%Y-%W, Date) will format each week of the year, retrieve only 1 distinct copy of it, and
+        # it will be counted. This is overall a lot simpler and way better than the logic heavy method that used to
+        # be here.
+        query = '''SELECT COUNT(DISTINCT strftime('%Y-%W', Date)) FROM PreviousWeeksSignInSignOut'''
         result = self._fetch_one(query)
-        # Return 0 weeks if there is nothing retrieved.
-        if result[0] is None or result[1] is None:
-            return 0
-        # Convert our earliest date to Y-M-D format as a datetime object.
-        start_date = datetime.strptime(result[0], '%Y-%m-%d').date()
-        # Convert our latest date to Y-M-D format as a datetime object.
-        end_date = datetime.strptime(result[1], '%Y-%m-%d').date()
-        # Get the amount of days in between.
-        total_days = (end_date - start_date).days
-        # Divide by 7 for amount of weeks and add 1 if total_weeks is not divisible by 7
-        # to account for any remaining days that are less than week, thus counting it as a full week.
-        return (total_days // 7) + (1 if total_days % 7 != 0 else 0)
-        # This method was doing far too much, so it's been refactored. The original looping logic has been placed in its
+        return result[0] if result else 0
 
+    # This method was doing far too much, so it's been refactored. The original looping logic has been placed in its
     # own method now.
     def get_week_date_range(self, page_number, page_size=1):
         # Select every distinct date from the table.
@@ -61,7 +51,7 @@ class PreviousWeeksSignInSignOut:
         all_dates = [datetime.strptime(row[0], '%Y-%m-%d').date() for row in self._fetch_all(query)]
         # Get every week as a grouping
         weeks = self._group_dates_into_weeks(all_dates)
-        # Return a list comprehension using our page number - 1 (since lists are 0 indexed) multiplied by the
+        # Return a sliced list using our page number - 1 (since lists are 0 indexed) multiplied by the
         # page size depending on how big we want our "pages" to be. The end of the list is just the page_number
         # multiplied by the page_size.
         # Page_size is essentially just a scale factor for both the beginning and end of the list comprehension
@@ -77,6 +67,7 @@ class PreviousWeeksSignInSignOut:
             # Return entries for the week after we get our date range, and tack it on to the paginated list.
             paginated_entries.extend(self.get_entries_for_week(start_date, end_date))
         total_weeks = self.get_total_weeks()
+        print(total_weeks)
         # Return our paginated list and the total of all weeks.
         return paginated_entries, total_weeks
 

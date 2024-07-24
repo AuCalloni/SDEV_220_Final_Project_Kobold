@@ -34,3 +34,7 @@ class PreviousWeekController:
     # Call the model's clear_entries method (PROBABLY DON'T EVER DO THIS OUTSIDE TESTING!)
     def get_entry_by_id(self, record_id):
         return self.model.get_entry_by_id(record_id)
+
+    # Call the model's get_total_weeks method
+    def get_total_weeks(self):
+        return self.model.get_total_weeks()
