@@ -110,7 +110,7 @@ class PreviousWeekGUI(QMainWindow):
             badge_item.setData(record_num, Qt.ItemDataRole.UserRole)
             # We do not want the badge field to be editable. The ~ operator is a bitwise NOT operator and the & is a
             # bitwise AND operator. We are essentially retrieving all the flags and just flipping the ItemIsEditable
-            # flag to be non edible.
+            # flag to be non-edible.
             badge_item.setFlags(badge_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             model.setItem(row, 0, badge_item)
 
