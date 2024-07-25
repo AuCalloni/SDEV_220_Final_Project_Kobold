@@ -108,17 +108,28 @@ class PreviousWeekGUI(QMainWindow):
             # Set the badge number item and set the record_number as background data.
             badge_item = QtGui.QStandardItem(str(badge_num))
             badge_item.setData(record_num, Qt.ItemDataRole.UserRole)
+            # We do not want the badge field to be editable. The ~ operator is a bitwise NOT operator and the & is a
+            # bitwise AND operator. We are essentially retrieving all the flags and just flipping the ItemIsEditable
+            # flag to be non edible.
+            badge_item.setFlags(badge_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             model.setItem(row, 0, badge_item)
 
             # Set the name column since our paginated weekly entries does not return a name.
             name_item = QtGui.QStandardItem(associate_name)
+            # Don't allow the name to be edited
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             model.setItem(row, 1, name_item)
 
-            # Set the other items (Date, SignInTime, SignOutTime, AdditionalNotes).
-            for column, value in enumerate(entry[2:6]):
+            # Set the date column and make it not editable
+            date_item = QtGui.QStandardItem(str(entry[2]))
+            date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # Make the date item not editable
+            model.setItem(row, 2, date_item)
+
+            # Set the other items (SignInTime, SignOutTime, AdditionalNotes).
+            for column, value in enumerate(entry[3:6]):
                 item = QtGui.QStandardItem(str(value))
                 # Add 2 to the column to offset it since we are slicing 2:6.
-                model.setItem(row, column + 2, item)
+                model.setItem(row, column + 3, item)
 
         # Set the table's model.
         self.table_view.setModel(model)
