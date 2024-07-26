@@ -122,7 +122,7 @@ class PreviousWeekGUI(QMainWindow):
 
             # Set the date column and make it not editable
             date_item = QtGui.QStandardItem(str(entry[2]))
-            date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # Make the date item not editable
+            date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             model.setItem(row, 2, date_item)
 
             # Set the other items (SignInTime, SignOutTime, AdditionalNotes).
